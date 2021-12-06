@@ -27,12 +27,24 @@ VPN_HOST="${_OVPN_REMOTE%% *}"
 PORT="${_OVPN_REMOTE#* }"
 PROTO="$(grep -oP 'proto\s+\K.+' "$ORIGINAL_OVPN_CONF")"
 
+SERVER_PID=""
+
 wait_file() {
   local file="$1"; shift
   local wait_seconds="${1:-10}"; shift # 10 seconds as default timeout
   until test $((wait_seconds--)) -eq 0 -o -f "$file" ; do sleep 1; done
   ((++wait_seconds))
 }
+
+cleanup() {
+  if [ -e "$OVPN_CONF" ]; then
+    rm "$OVPN_CONF"
+  fi
+  if [ -z "$SERVER_PID" ]; then
+    kill "$SERVER_PID"
+  fi
+}
+trap "cleanup" EXIT
 
 # create random hostname prefix for the vpn gw
 RAND=$(openssl rand -hex 12)
@@ -42,6 +54,9 @@ SRV=$(dig a +short "${RAND}.${VPN_HOST}"|head -n1)
 
 # cleanup
 rm -f saml-response.txt
+
+go run server.go &
+SERVER_PID=$!
 
 echo "Getting SAML redirect URL from the AUTH_FAILED response (host: ${SRV}:${PORT})"
 OVPN_OUT=$($OVPN_BIN --config "${OVPN_CONF}" --verb 3 \
