@@ -38,7 +38,7 @@ wait_file() {
 
 cleanup() {
   if [ -e "$OVPN_CONF" ]; then
-    rm "$OVPN_CONF"
+    rm -f "$OVPN_CONF"
   fi
   if [ -z "$SERVER_PID" ]; then
     kill "$SERVER_PID"
