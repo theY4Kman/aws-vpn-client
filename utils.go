@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"net"
 	"os"
 	"os/exec"
@@ -22,6 +23,30 @@ func openDefaultBrowser(url string) (err error) {
 		err = exec.Command("open", url).Start()
 	default:
 		err = fmt.Errorf("unsupported patform %s", runtime.GOOS)
+	}
+
+	return
+}
+
+func openBrowser(url string, command string, args []string) (err error) {
+	if command == "" {
+		err = openDefaultBrowser(url)
+	} else {
+		// Replace %f with URL in command args. If %f is not found, append URL to args.
+		urlSpecifierFound := false
+		for i, arg := range args {
+			if strings.Contains(arg, "%f") {
+				args[i] = strings.ReplaceAll(arg, "%f", url)
+				urlSpecifierFound = true
+			}
+		}
+		if !urlSpecifierFound {
+			args = append(args, url)
+		}
+
+		log.Debug().Strs("args", args).Msg("executing browser command")
+
+		err = exec.Command(command, args...).Start()
 	}
 
 	return

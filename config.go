@@ -1,7 +1,7 @@
 package main
 
 import (
-	"io/ioutil"
+	"os"
 
 	"gopkg.in/yaml.v2"
 )
@@ -19,14 +19,20 @@ type (
 		Addr string
 	}
 
+	browser struct {
+		Command     string
+		CommandArgs []string
+	}
+
 	config struct {
-		Vpn    vpn
-		Server server
+		Vpn     vpn
+		Server  server
+		Browser browser
 	}
 )
 
 func loadConfig(filename string) (c *config, err error) {
-	fileBytes, err := ioutil.ReadFile(filename)
+	fileBytes, err := os.ReadFile(filename)
 
 	if err != nil {
 		return

@@ -64,6 +64,9 @@ func main() {
 	// Setup logging
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
+	// Show what the hell it's doing
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+
 	err := app.Run(os.Args)
 
 	if err != nil {

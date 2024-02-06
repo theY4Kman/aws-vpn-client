@@ -20,6 +20,7 @@ type (
 		OpenVPNConnectionConfig *openVPNConfig
 		TempDir                 string
 
+		HttpServer   *http.Server
 		SAMLResponse chan string
 		ServiceIPv4  string
 		ServiceHost  string
@@ -140,7 +141,11 @@ func startOpenVPNConnection(handle *serveHandle) {
 		log.Fatal().Err(err).Msg("No URLs found in payload from server! Please check the DEBUG logs for more information. " + errorSuffix)
 	}
 
-	openDefaultBrowser(foundURLs[len(foundURLs)-1])
+	err = openBrowser(foundURLs[len(foundURLs)-1], handle.Config.Browser.Command, handle.Config.Browser.CommandArgs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed opening default browser! " + errorSuffix)
+		return
+	}
 
 	log.Info().Msg("Waiting for SAML response from 3rd party service...")
 	SAMLResponse := <-handle.SAMLResponse
@@ -207,8 +212,14 @@ func startOpenVPNConnection(handle *serveHandle) {
 }
 
 func startSAMLServer(handle *serveHandle) {
-	http.HandleFunc("/", SAMLServer(handle))
-	http.ListenAndServe(handle.Config.Server.Addr, nil)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", SAMLServer(handle))
+
+	handle.HttpServer = &http.Server{
+		Addr:    handle.Config.Server.Addr,
+		Handler: mux,
+	}
+	handle.HttpServer.ListenAndServe()
 }
 
 func SAMLServer(handle *serveHandle) func(http.ResponseWriter, *http.Request) {
@@ -229,7 +240,14 @@ func SAMLServer(handle *serveHandle) func(http.ResponseWriter, *http.Request) {
 			}
 
 			handle.SAMLResponse <- SAMLResponse
-			fmt.Fprintf(w, "Got SAMLResponse field, it is now safe to close this window\n")
+			w.Header().Add("Content-Type", "text/html")
+			fmt.Fprintf(w, "Got SAMLResponse field, it is now safe to close this window\n"+
+				"<script>window.close()</script>")
+
+			defer func() {
+				go handle.HttpServer.Shutdown(r.Context())
+			}()
+
 		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			fmt.Fprintf(w, "Error: POST method expected, %s received\n", r.Method)
